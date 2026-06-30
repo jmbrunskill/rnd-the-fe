@@ -294,3 +294,59 @@ code {
     border-right-color: var(--border);
   }
 }
+
+/* --- Nav bar + routed views ----------------------------------------- */
+
+#nav {
+  border-bottom: 1px solid var(--border);
+}
+
+.nav {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  width: 1126px;
+  max-width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+  padding: 12px 32px;
+
+  @media (max-width: 1024px) {
+    padding: 12px 20px;
+  }
+}
+
+.nav a {
+  color: var(--text);
+  text-decoration: none;
+  font-size: 16px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  transition:
+    background 0.2s,
+    color 0.2s;
+
+  &:hover {
+    color: var(--text-h);
+    background: var(--social-bg);
+  }
+
+  &.active {
+    color: var(--accent);
+    background: var(--accent-bg);
+  }
+}
+
+.page {
+  flex-grow: 1;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  place-content: center;
+
+  @media (max-width: 1024px) {
+    padding: 24px 20px;
+  }
+}
