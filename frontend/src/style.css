@@ -305,3 +305,133 @@ code {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+
+/* Below 600px the table is unreadable (17 cols), so it reflows to a stack of
+   cards (mSupply UI standard). Pure CSS: each <tr> becomes a CSS-grid card. The
+   card content is driven by each column's `card` slot (columns.ts) — the
+   renderer stamps data-card / data-label, and these rules place & label them.
+   No second DOM: the same <table> is reflowed, so the ~1500-row page stays lean
+   and the client-side filter (which toggles each <tr>'s inline display) still
+   works — a matched row's inline display:"" falls back to display:grid here. */
+@media (max-width: 600px) {
+  .table-wrap {
+    border: none;
+  }
+
+  .stock-table,
+  .stock-table tbody {
+    display: block;
+    white-space: normal;
+  }
+
+  /* Column headers live on the card cells (::before), so drop the header row. */
+  .stock-table thead {
+    display: none;
+  }
+
+  /* Each row is a card: identity + badge on top, secondary fields in 2 columns. */
+  .stock-table tbody tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: var(--space-4);
+    row-gap: var(--space-3);
+    align-content: start;
+    min-height: var(--touch-min);
+    padding: var(--space-4);
+    margin-bottom: var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+  }
+
+  /* Cells: shed table chrome; columns without a card slot are hidden. */
+  .stock-table td {
+    padding: 0;
+    border-bottom: none;
+  }
+  .stock-table td:not([data-card]) {
+    display: none;
+  }
+  .stock-table td.num {
+    text-align: left;
+  }
+
+  /* Name over Code, top-left. */
+  .stock-table td[data-card="title"] {
+    grid-column: 1;
+    grid-row: 1;
+    font-size: var(--text-size);
+    font-weight: var(--weight-header);
+    color: var(--text-strong);
+  }
+  .stock-table td[data-card="subtitle"] {
+    grid-column: 1;
+    grid-row: 2;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text);
+  }
+
+  /* Difference as a neutral chip, top-right, spanning both header rows. */
+  .stock-table td[data-card="badge"] {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    justify-self: end;
+    align-self: start;
+    padding: 2px var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--text-strong);
+    font-size: var(--text-size-sm);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Secondary fields: label (::before) above value. The placed header/badge
+     cells fill rows 1-2, so these auto-flow from row 3; `order` pairs them
+     (Snapshot #/Counted #) regardless of source column order. */
+  .stock-table td[data-card="grid"] {
+    font-size: var(--text-size);
+    color: var(--text-strong);
+  }
+  .stock-table td[data-card="grid"]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 11px;
+    font-weight: var(--weight-header);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text);
+  }
+  /* Missing value still reads as a present field. */
+  .stock-table td[data-card="grid"]:empty::after {
+    content: "—";
+    color: var(--text);
+  }
+  .stock-table td[data-card="grid"][data-label="Batch"] {
+    font-family: var(--font-mono);
+    font-size: var(--text-size-sm);
+  }
+
+  .stock-table td[data-label="Batch"] {
+    order: 1;
+  }
+  .stock-table td[data-label="Expiry Date"] {
+    order: 2;
+  }
+  .stock-table td[data-label="Snapshot # Packs"] {
+    order: 3;
+  }
+  .stock-table td[data-label="Counted # Packs"] {
+    order: 4;
+  }
+  .stock-table td[data-label="Location"] {
+    order: 5;
+  }
+  .stock-table td[data-label="Reason"] {
+    order: 6;
+  }
+  .stock-table td[data-label="Manufacturer"] {
+    order: 7;
+  }
+}

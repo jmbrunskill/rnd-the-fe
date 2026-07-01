@@ -1,5 +1,11 @@
 import { esc, type Html } from "./html.ts";
 
+// Where a column lands in the <600px card layout (see the `@media` block in
+// style.css). "title"/"subtitle" stack top-left, "badge" sits top-right, "grid"
+// cells flow into the 2-column labelled grid. A column with no `card` is hidden
+// on the card. The card is driven entirely off these slots — one source of truth.
+export type CardSlot = "title" | "subtitle" | "badge" | "grid";
+
 // A single column of a table over rows of type `T`. Typing the column array as
 // `Column<StocktakeLine>[]` ties every `cell`/`html` accessor to the row type,
 // so a typo (`row.snapshotNumPacks`) or reading a field the query didn't select
@@ -15,6 +21,8 @@ export interface Column<T> {
   align?: "left" | "right";
   // Default true. `false` drops the column — used for preference-gated columns.
   include?: boolean;
+  // Mobile (<600px) card placement. Omit => the column is hidden on the card.
+  card?: CardSlot;
 }
 
 export interface TableOptions<T> {
@@ -51,7 +59,11 @@ export function renderTable<T>(
         const cells = cols
           .map((c) => {
             const content: Html = c.html ? c.html(row) : esc(c.cell(row));
-            return `<td${colClass(c)}>${content}</td>`;
+            // Card attributes only on columns that opt in (keeps the HTML lean).
+            // data-label carries the field label for the grid cells' ::before.
+            const cardAttr = c.card ? ` data-card="${c.card}"` : "";
+            const labelAttr = c.card === "grid" ? ` data-label="${esc(c.header)}"` : "";
+            return `<td${colClass(c)}${cardAttr}${labelAttr}>${content}</td>`;
           })
           .join("");
         return `<tr${key}>${cells}</tr>`;

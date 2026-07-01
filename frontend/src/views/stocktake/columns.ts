@@ -39,13 +39,16 @@ function dosesCounted(l: StocktakeLine): string {
 // off. Every `l.*` access is checked against the generated StocktakeLine type.
 export function lineColumns(prefs: StocktakePrefs): Column<StocktakeLine>[] {
   const { manageVaccinesInDoses, allowTrackingOfStockByDonor } = prefs;
+  // `card` slots drive the <600px card layout (see style.css). Identity up top
+  // (title/subtitle), Difference as the badge, key fields in the grid; columns
+  // without a slot are hidden on the card.
   return [
-    { header: "Code", cell: (l) => l.item.code },
-    { header: "Name", cell: (l) => l.itemName },
-    { header: "Batch", cell: (l) => l.batch ?? "" },
-    { header: "Expiry Date", cell: (l) => fmtDate(l.expiryDate) },
+    { header: "Code", card: "subtitle", cell: (l) => l.item.code },
+    { header: "Name", card: "title", cell: (l) => l.itemName },
+    { header: "Batch", card: "grid", cell: (l) => l.batch ?? "" },
+    { header: "Expiry Date", card: "grid", cell: (l) => fmtDate(l.expiryDate) },
     { header: "Manufacture Date", cell: (l) => fmtDate(l.manufactureDate) },
-    { header: "Location", cell: (l) => l.location?.code ?? "" },
+    { header: "Location", card: "grid", cell: (l) => l.location?.code ?? "" },
     { header: "Unit Name", cell: (l) => l.item.unitName ?? "" },
     { header: "Pack Size", align: "right", cell: (l) => num(l.packSize) },
     {
@@ -54,8 +57,18 @@ export function lineColumns(prefs: StocktakePrefs): Column<StocktakeLine>[] {
       include: manageVaccinesInDoses,
       cell: (l) => (l.item.isVaccine ? num(l.item.doses) : ""),
     },
-    { header: "Snapshot # Packs", align: "right", cell: (l) => num(l.snapshotNumberOfPacks) },
-    { header: "Counted # Packs", align: "right", cell: (l) => num(l.countedNumberOfPacks) },
+    {
+      header: "Snapshot # Packs",
+      align: "right",
+      card: "grid",
+      cell: (l) => num(l.snapshotNumberOfPacks),
+    },
+    {
+      header: "Counted # Packs",
+      align: "right",
+      card: "grid",
+      cell: (l) => num(l.countedNumberOfPacks),
+    },
     {
       header: "Doses Counted",
       align: "right",
@@ -65,18 +78,19 @@ export function lineColumns(prefs: StocktakePrefs): Column<StocktakeLine>[] {
     {
       header: "Difference",
       align: "right",
+      card: "badge",
       cell: (l) => {
         const d = difference(l);
         return d > 0 ? `+${d}` : String(d);
       },
     },
-    { header: "Reason", cell: (l) => l.reasonOption?.reason ?? "" },
+    { header: "Reason", card: "grid", cell: (l) => l.reasonOption?.reason ?? "" },
     {
       header: "Donor",
       include: allowTrackingOfStockByDonor,
       cell: (l) => l.donorName ?? "",
     },
-    { header: "Manufacturer", cell: (l) => l.manufacturer?.name ?? "" },
+    { header: "Manufacturer", card: "grid", cell: (l) => l.manufacturer?.name ?? "" },
     { header: "Comment", cell: (l) => l.comment ?? "" },
   ];
 }
