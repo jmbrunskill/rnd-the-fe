@@ -24,6 +24,13 @@
       "readySignal": "[data-testid=\"stocktake-table\"][data-ready=\"true\"]",
       "dataItemCountSelector": "[data-testid=\"stocktake-table\"] tbody tr",
       "dataRequestUrlPattern": "/graphql"
+    },
+    {
+      "name": "stocktake-list-paginated",
+      "path": "/stocktake",
+      "readySignal": "[data-testid=\"stocktake-list\"][data-ready=\"true\"]",
+      "dataItemCountSelector": "[data-testid=\"stocktake-list\"] tbody tr",
+      "dataRequestUrlPattern": "/graphql"
     }
   ]
 }
