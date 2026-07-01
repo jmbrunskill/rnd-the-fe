@@ -25,6 +25,14 @@ export type StocktakeQueryVariables = Types.Exact<{
 
 export type StocktakeQuery = { __typename: 'Queries', stocktake: { __typename: 'NodeError' } | { __typename: 'StocktakeNode', id: string, comment?: string | null, description?: string | null, createdDatetime: string, finalisedDatetime?: string | null, stocktakeNumber: number, status: Types.StocktakeNodeStatus, isLocked: boolean, isInitialStocktake: boolean, lines: { __typename: 'StocktakeLineConnector', totalCount: number, nodes: Array<{ __typename: 'StocktakeLineNode', id: string, itemName: string, batch?: string | null, expiryDate?: string | null, manufactureDate?: string | null, packSize?: number | null, snapshotNumberOfPacks: number, countedNumberOfPacks?: number | null, comment?: string | null, donorName?: string | null, location?: { __typename: 'LocationNode', code: string } | null, item: { __typename: 'ItemNode', code: string, unitName?: string | null, isVaccine: boolean, doses: number, defaultPackSize: number }, reasonOption?: { __typename: 'ReasonOptionNode', reason: string } | null, manufacturer?: { __typename: 'NameNode', name: string } | null }> } }, preferences: { __typename: 'PreferencesNode', manageVaccinesInDoses: boolean, allowTrackingOfStockByDonor: boolean } };
 
+export type DeleteStocktakeLinesMutationVariables = Types.Exact<{
+  storeId: Types.Scalars['String']['input'];
+  ids?: Types.InputMaybe<Array<Types.DeleteStocktakeLineInput> | Types.DeleteStocktakeLineInput>;
+}>;
+
+
+export type DeleteStocktakeLinesMutation = { __typename: 'Mutations', batchStocktake: { __typename: 'BatchStocktakeResponse', deleteStocktakeLines?: Array<{ __typename: 'DeleteStocktakeLineResponseWithId', id: string, response: { __typename: 'DeleteResponse', id: string } | { __typename: 'DeleteStocktakeLineError', error: { __typename: 'CannotEditStocktake', description: string } } }> | null } };
+
 export class TypedDocumentString<TResult, TVariables>
   extends String
   implements DocumentTypeDecoration<TResult, TVariables>
@@ -228,3 +236,26 @@ fragment Stocktake on StocktakeNode {
     }
   }
 }`) as unknown as TypedDocumentString<StocktakeQuery, StocktakeQueryVariables>;
+export const DeleteStocktakeLinesDocument = new TypedDocumentString(`
+    mutation deleteStocktakeLines($storeId: String!, $ids: [DeleteStocktakeLineInput!]) {
+  batchStocktake(storeId: $storeId, input: {deleteStocktakeLines: $ids}) {
+    __typename
+    ... on BatchStocktakeResponse {
+      deleteStocktakeLines {
+        id
+        response {
+          __typename
+          ... on DeleteResponse {
+            id
+          }
+          ... on DeleteStocktakeLineError {
+            error {
+              description
+            }
+          }
+        }
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<DeleteStocktakeLinesMutation, DeleteStocktakeLinesMutationVariables>;

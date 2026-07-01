@@ -22,3 +22,14 @@ export function esc(value: string | number | null | undefined): Html {
   if (value == null) return "" as Html;
   return String(value).replace(/[&<>"']/g, (ch) => ESCAPES[ch]) as Html;
 }
+
+// Tagged template for building trusted markup (the escape hatch for Column.html
+// / headerHtml — e.g. a checkbox or button). The static parts are trusted; every
+// ${interpolation} is `esc()`-d, so dynamic data can't break out. Returns Html.
+export function html(strings: TemplateStringsArray, ...values: unknown[]): Html {
+  let out = strings[0];
+  for (let i = 0; i < values.length; i++) {
+    out += esc(values[i] as string | number | null | undefined) + strings[i + 1];
+  }
+  return out as Html;
+}

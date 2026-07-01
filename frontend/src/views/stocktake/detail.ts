@@ -1,12 +1,13 @@
 import type { View } from "../../router.ts";
 import {
+  deleteStocktakeLines,
   getStocktake,
   lineHaystack,
   statusLabel,
   stocktakeTitle,
   type StocktakeLine,
 } from "../../data/stocktakes.ts";
-import { esc } from "../../components/html.ts";
+import { esc, html } from "../../components/html.ts";
 import {
   renderTable,
   sortRows,
@@ -15,6 +16,7 @@ import {
   type Column,
 } from "../../components/table.ts";
 import { lineColumns } from "./columns.ts";
+import { toast } from "../../components/toast.ts";
 import { queryParams, setQuery } from "../../url.ts";
 
 // page--table opts this view into the full-width, viewport-bounded table layout
@@ -50,7 +52,24 @@ export const render: View<"/stocktake/:id"> = (outlet, params) => {
         ` · created ${esc(new Date(stocktake.createdDatetime).toLocaleString())}</p>` +
         (stocktake.comment ? `<p>${esc(stocktake.comment)}</p>` : "");
 
-      const cols = lineColumns(prefs);
+      // Selection + delete are offered only when the stocktake is editable
+      // (matches open-mSupply: no edits once FINALISED or locked).
+      const editable = stocktake.status === "NEW" && !stocktake.isLocked;
+
+      // Leading checkbox column — composed here (not in lineColumns) so the data
+      // columns stay pure. `kind:"actions"` => not sortable; headerHtml is the
+      // select-all box; html is the per-row box.
+      const selectCol: Column<StocktakeLine> = {
+        header: "",
+        key: "__select",
+        kind: "actions",
+        cellClass: "col-select",
+        headerHtml: () =>
+          html`<input type="checkbox" class="select-all" aria-label="Select all rows">`,
+        html: () => html`<input type="checkbox" class="row-select" aria-label="Select row">`,
+      };
+
+      const cols = editable ? [selectCol, ...lineColumns(prefs)] : lineColumns(prefs);
       const table = renderTable(lines, cols, {
         className: "stock-table",
         testId: "stocktake-table",
@@ -59,14 +78,17 @@ export const render: View<"/stocktake/:id"> = (outlet, params) => {
       });
 
       // Search box + live count live ABOVE the table so updates never touch the
-      // input (focus/value survive). Left unstyled on purpose — the design-system
-      // "inputs" increment owns the presentation.
+      // input (focus/value survive). The delete button (editable only) shows a
+      // live selected count and is hidden until something is selected.
       const toolbar =
         `<div class="stock-toolbar">` +
         `<input type="search" class="stock-filter"` +
         ` placeholder="Search item code, name or batch…"` +
         ` aria-label="Search stocktake lines" autocomplete="off" spellcheck="false">` +
         `<span class="stock-count" aria-live="polite"></span>` +
+        (editable
+          ? `<button type="button" class="stock-delete" hidden>Delete</button>`
+          : "") +
         `</div>`;
 
       outlet.innerHTML = page(
@@ -122,9 +144,11 @@ function wireTable(
   const sortableByKey = new Map<string, Column<StocktakeLine>>();
   for (const c of cols) if (isSortable(c)) sortableByKey.set(columnKey(c), c);
 
-  const total = lines.length;
+  // Mutable working set: filter/sort/count iterate this, and delete removes from
+  // it (plus nodeById/haystackById) so a later sort can't re-append dead rows.
+  let current: StocktakeLine[] = lines.slice();
   const setCount = (shown: number) => {
-    countEl.textContent = `Showing ${shown} of ${total}`;
+    countEl.textContent = `Showing ${shown} of ${current.length}`;
   };
 
   const view = { query: "", sortKey: null as string | null, sortDir: "asc" as "asc" | "desc" };
@@ -134,7 +158,7 @@ function wireTable(
   const applyFilter = () => {
     const q = view.query.trim().toLowerCase();
     let shown = 0;
-    for (const l of lines) {
+    for (const l of current) {
       const node = nodeById.get(l.id);
       if (!node) continue;
       const match = q === "" || (haystackById.get(l.id) ?? "").includes(q);
@@ -150,7 +174,7 @@ function wireTable(
   // count is unchanged (same rows, reordered).
   const applySort = () => {
     const col = view.sortKey ? sortableByKey.get(view.sortKey) : undefined;
-    const ordered = col ? sortRows(lines, col, view.sortDir) : lines;
+    const ordered = col ? sortRows(current, col, view.sortDir) : current;
     const frag = document.createDocumentFragment();
     for (const l of ordered) {
       const node = nodeById.get(l.id);
@@ -214,6 +238,105 @@ function wireTable(
   };
   thead.addEventListener("click", onHeadClick);
 
+  // --- selection + delete (only wired when editable: the select column + delete
+  // button were rendered; otherwise these are absent and this is a no-op) ---
+  const deleteBtn = outlet.querySelector<HTMLButtonElement>(".stock-delete");
+  const selectAll = tableEl.querySelector<HTMLInputElement>(".select-all");
+  const selected = new Set<string>();
+
+  const visibleRows = (): HTMLElement[] =>
+    current
+      .map((l) => nodeById.get(l.id))
+      .filter((n): n is HTMLElement => !!n && n.style.display !== "none");
+
+  const refreshDeleteBtn = () => {
+    if (!deleteBtn) return;
+    deleteBtn.hidden = selected.size === 0;
+    deleteBtn.textContent = `Delete (${selected.size})`;
+  };
+  const syncSelectAll = () => {
+    if (!selectAll) return;
+    const vis = visibleRows();
+    const sel = vis.filter((n) => !!n.dataset.id && selected.has(n.dataset.id)).length;
+    selectAll.checked = vis.length > 0 && sel === vis.length;
+    selectAll.indeterminate = sel > 0 && sel < vis.length;
+  };
+  const setRowSelected = (node: HTMLElement, id: string, on: boolean) => {
+    if (on) {
+      selected.add(id);
+      node.setAttribute("data-selected", "");
+    } else {
+      selected.delete(id);
+      node.removeAttribute("data-selected");
+    }
+    const cb = node.querySelector<HTMLInputElement>(".row-select");
+    if (cb) cb.checked = on;
+  };
+
+  // Row checkbox — delegated on <tbody>.
+  const onRowChange = (e: Event) => {
+    const cb = e.target;
+    if (!(cb instanceof HTMLInputElement) || !cb.classList.contains("row-select")) return;
+    const node = cb.closest<HTMLElement>("tr");
+    const id = node?.dataset.id;
+    if (!node || !id) return;
+    setRowSelected(node, id, cb.checked);
+    syncSelectAll();
+    refreshDeleteBtn();
+  };
+  tbody.addEventListener("change", onRowChange);
+
+  // Select-all — toggles the currently VISIBLE rows (respects the filter).
+  const onSelectAll = () => {
+    if (!selectAll) return;
+    const on = selectAll.checked;
+    for (const node of visibleRows()) {
+      if (node.dataset.id) setRowSelected(node, node.dataset.id, on);
+    }
+    syncSelectAll();
+    refreshDeleteBtn();
+  };
+  selectAll?.addEventListener("change", onSelectAll);
+
+  // Delete — one batch mutation, then surgical removal of ONLY the ids the server
+  // confirmed. Partial/total failures and thrown errors surface as a toast.
+  let deleting = false;
+  const onDelete = async () => {
+    if (deleting || selected.size === 0) return;
+    const ids = [...selected];
+    const noun = (n: number) => (n === 1 ? "line" : "lines");
+    if (!confirm(`Delete ${ids.length} ${noun(ids.length)}?`)) return;
+    deleting = true;
+    if (deleteBtn) deleteBtn.disabled = true;
+    try {
+      const { deleted, errors } = await deleteStocktakeLines(ids);
+      if (deleted.length) {
+        const gone = new Set(deleted);
+        for (const id of deleted) {
+          nodeById.get(id)?.remove();
+          nodeById.delete(id);
+          haystackById.delete(id);
+          selected.delete(id);
+        }
+        current = current.filter((l) => !gone.has(l.id));
+      }
+      applyFilter(); // refresh visible count against the shrunken working set
+      syncSelectAll();
+      refreshDeleteBtn();
+      if (errors.length) {
+        toast(`Couldn't delete ${errors.length} ${noun(errors.length)}: ${errors[0].message}`, "error");
+      } else if (deleted.length) {
+        toast(`Deleted ${deleted.length} ${noun(deleted.length)}`, "success");
+      }
+    } catch (e) {
+      toast(`Delete failed: ${e instanceof Error ? e.message : String(e)}`, "error");
+    } finally {
+      deleting = false;
+      if (deleteBtn) deleteBtn.disabled = false;
+    }
+  };
+  deleteBtn?.addEventListener("click", onDelete);
+
   // Restore filter + sort from the URL on mount (deep link / refresh / browser
   // back into this view). Invalid/stale ?sort keys are ignored.
   const p = queryParams();
@@ -227,11 +350,16 @@ function wireTable(
   updateAriaSort();
   if (view.sortKey) applySort();
   if (view.query) applyFilter();
-  else setCount(total);
+  else setCount(current.length);
+  syncSelectAll();
+  refreshDeleteBtn();
 
   return () => {
     clearTimeout(timer);
     input.removeEventListener("input", onInput);
     thead.removeEventListener("click", onHeadClick);
+    tbody.removeEventListener("change", onRowChange);
+    selectAll?.removeEventListener("change", onSelectAll);
+    deleteBtn?.removeEventListener("click", onDelete);
   };
 }

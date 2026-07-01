@@ -89,3 +89,29 @@ query stocktake($stocktakeId: String!, $storeId: String!) {
     allowTrackingOfStockByDonor
   }
 }
+
+# Delete N stocktake lines in one round trip via the batch mutation. The response
+# reports success/failure PER id (DeleteResponse vs DeleteStocktakeLineError), so
+# the caller can remove only the rows the server actually deleted and surface the
+# rest as an error.
+mutation deleteStocktakeLines($storeId: String!, $ids: [DeleteStocktakeLineInput!]) {
+  batchStocktake(storeId: $storeId, input: { deleteStocktakeLines: $ids }) {
+    __typename
+    ... on BatchStocktakeResponse {
+      deleteStocktakeLines {
+        id
+        response {
+          __typename
+          ... on DeleteResponse {
+            id
+          }
+          ... on DeleteStocktakeLineError {
+            error {
+              description
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -352,6 +352,43 @@ code {
   background: var(--surface);
 }
 
+/* Row selection (step 5). Checkboxes use the brand blue; the select column is
+   narrow. The selected-row tint comes AFTER the hover rule so it wins when a
+   selected row is also hovered. */
+.stock-table .col-select {
+  width: 44px;
+  text-align: center;
+}
+.stock-table input[type="checkbox"] {
+  accent-color: var(--tmf-blue);
+  cursor: pointer;
+  margin: 0;
+  vertical-align: middle;
+}
+.stock-table tbody tr[data-selected] td {
+  background: var(--tmf-blue-bg);
+}
+
+/* Delete button — shown in the toolbar only when rows are selected. */
+.stock-delete {
+  height: var(--input-h);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--error);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--error);
+  font: inherit;
+  font-weight: var(--weight-header);
+  cursor: pointer;
+}
+.stock-delete:hover:not(:disabled) {
+  background: var(--error-bg);
+}
+.stock-delete:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* Name column wraps to 2 lines then ellipsis, opting out of the table's nowrap.
    max-width gives the clamp something to bound against on a nowrap/100% table. */
 .stock-table td.cell-name {
@@ -547,4 +584,38 @@ code {
   .stock-table td[data-label="Manufacturer"] {
     order: 7;
   }
+}
+
+/* Toasts — transient notifications (e.g. delete success/failure). Fixed
+   bottom-right stack; click to dismiss; auto-fades (see components/toast.ts). */
+.toast-container {
+  position: fixed;
+  bottom: var(--space-4);
+  right: var(--space-4);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: min(360px, calc(100vw - 2 * var(--space-4)));
+}
+.toast {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text-strong);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.12);
+  font-size: var(--text-size-sm);
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+}
+.toast--error {
+  border-left-color: var(--error);
+}
+.toast--success {
+  border-left-color: var(--success);
+}
+.toast--leaving {
+  opacity: 0;
 }

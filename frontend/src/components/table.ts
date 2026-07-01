@@ -29,8 +29,11 @@ export interface Column<T> {
   // Returns plain text (the renderer escapes it). Falls back to the kind format.
   format?: (value: CellValue, row: T) => string;
   // Trusted-markup escape hatch (e.g. a checkbox/delete button); supersedes
-  // value/format for rendering. Build it with `esc()`, never by hand.
+  // value/format for rendering. Build it with `esc()`/`html``, never by hand.
   html?: (row: T) => Html;
+  // Trusted-markup escape hatch for the HEADER cell (e.g. a select-all checkbox),
+  // used instead of the `esc(header)` text / sortable button when present.
+  headerHtml?: () => Html;
   // Opt a column OUT of sorting (kind "actions" is never sortable regardless).
   sortable?: boolean;
   // Stable sort id + header-click key; defaults to `header`.
@@ -191,6 +194,9 @@ export function renderTable<T>(
     cols
       .map((c) => {
         const cls = clsAttr(columnClass(c));
+        if (c.headerHtml) {
+          return `<th${cls}>${c.headerHtml()}</th>`;
+        }
         if (isSortable(c)) {
           return (
             `<th${cls} aria-sort="none" data-sort-key="${esc(columnKey(c))}">` +

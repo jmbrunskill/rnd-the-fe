@@ -1,5 +1,6 @@
 import { gqlRequest } from "../api/request.ts";
 import {
+  DeleteStocktakeLinesDocument,
   StocktakeDocument,
   StocktakesDocument,
   type StocktakeFragment,
@@ -91,4 +92,27 @@ export function statusLabel(status: StocktakeNodeStatus): string {
 // substring scan. Precompute one per line at load; see the detail view's filter.
 export function lineHaystack(l: StocktakeLine): string {
   return `${l.item.code}\n${l.itemName}\n${l.batch ?? ""}`.toLowerCase();
+}
+
+// Outcome of a batch delete: which ids the server actually deleted, and any
+// per-line failures (so the caller removes only confirmed rows and surfaces the
+// rest). gqlRequest throws on transport/GraphQL-level errors — caught upstream.
+export interface DeleteResult {
+  deleted: string[];
+  errors: { id: string; message: string }[];
+}
+
+// Delete N stocktake lines in one batch request. Parses the per-id response.
+export async function deleteStocktakeLines(ids: string[]): Promise<DeleteResult> {
+  const { batchStocktake } = await gqlRequest(DeleteStocktakeLinesDocument, {
+    storeId: STORE_ID,
+    ids: ids.map((id) => ({ id })),
+  });
+  const deleted: string[] = [];
+  const errors: { id: string; message: string }[] = [];
+  for (const line of batchStocktake.deleteStocktakeLines ?? []) {
+    if (line.response.__typename === "DeleteResponse") deleted.push(line.id);
+    else errors.push({ id: line.id, message: line.response.error.description });
+  }
+  return { deleted, errors };
 }
