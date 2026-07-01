@@ -261,6 +261,40 @@ code {
   color: var(--error);
 }
 
+/* Filter toolbar: search box + live "Showing X of Y" count, above the table. */
+.stock-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* Search input — mSupply/shadcn input standard: 40px tall, 1px border, 6px
+   radius, 14px text, orange focus glow (overrides the global 2px focus ring). */
+.stock-filter {
+  height: var(--input-h);
+  min-width: 280px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text-strong);
+  font: inherit;
+}
+.stock-filter::placeholder {
+  color: var(--text);
+}
+.stock-filter:focus-visible {
+  outline: none;
+  border-color: var(--tmf-orange);
+  box-shadow: 0 0 0 3px var(--tmf-orange-bg);
+}
+
+.stock-count {
+  color: var(--text);
+  font-size: var(--text-size-sm);
+}
+
 /* Stocktake detail lines table. 17 columns is wide and there are ~1500 rows, so
    the wrapper is a bounded scroll region (flex-fills the viewport height inside
    .page--table, min-height:0 lets it shrink to fit). Scrolling both axes stays

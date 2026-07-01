@@ -15,6 +15,7 @@ import {
   type Column,
 } from "../../components/table.ts";
 import { lineColumns } from "./columns.ts";
+import { queryParams, setQuery } from "../../url.ts";
 
 // page--table opts this view into the full-width, viewport-bounded table layout
 // (edge-to-edge, internal scroll region) instead of the centered .page column.
@@ -168,6 +169,16 @@ function wireTable(
     }
   };
 
+  // Mirror the current filter + sort into the URL (?search / ?sort / ?dir) via
+  // replaceState — shareable, survives refresh, and (bypassing the router)
+  // fires no refetch. `dir` is written only for desc; asc is implied.
+  const syncUrl = () =>
+    setQuery({
+      search: view.query.trim() || null,
+      sort: view.sortKey,
+      dir: view.sortKey && view.sortDir === "desc" ? "desc" : null,
+    });
+
   // Filter input — debounced so fast typing coalesces into one update.
   let timer = 0;
   const onInput = () => {
@@ -175,6 +186,7 @@ function wireTable(
     timer = window.setTimeout(() => {
       view.query = input.value;
       applyFilter();
+      syncUrl();
     }, 120);
   };
   input.addEventListener("input", onInput);
@@ -198,10 +210,24 @@ function wireTable(
     }
     updateAriaSort();
     applySort();
+    syncUrl();
   };
   thead.addEventListener("click", onHeadClick);
 
-  setCount(total);
+  // Restore filter + sort from the URL on mount (deep link / refresh / browser
+  // back into this view). Invalid/stale ?sort keys are ignored.
+  const p = queryParams();
+  view.query = p.get("search") ?? "";
+  const urlSort = p.get("sort");
+  if (urlSort && sortableByKey.has(urlSort)) {
+    view.sortKey = urlSort;
+    view.sortDir = p.get("dir") === "desc" ? "desc" : "asc";
+  }
+  input.value = view.query;
+  updateAriaSort();
+  if (view.sortKey) applySort();
+  if (view.query) applyFilter();
+  else setCount(total);
 
   return () => {
     clearTimeout(timer);
