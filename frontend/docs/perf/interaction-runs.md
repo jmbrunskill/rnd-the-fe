@@ -25,3 +25,20 @@ iterations 10 (50 samples/strategy/run), 3 runs. Commit f184892 (+ uncommitted).
 400–500 ms whenever a query matches many rows; row-toggle is flat (~57 ms median, ~104 ms p95)
 regardless of match count. Trade-off: all 1506 `<tr>` stay resident in the DOM. Decision: ship the
 filter with the row-visibility-toggle strategy.
+
+## stocktake detail — sort strategies
+
+Context: Apple M3 Pro (11 cores), macOS 26.5.1, Chrome 149, 6× CPU throttle, dev server, 1506 rows ×
+14 cols. Sort set `[Name-asc, Snapshot#Packs-desc, ExpiryDate-asc, none]`, iterations 10 (40
+samples/strategy/run), 3 runs. Bench: `docs/perf/bench/sort-strategies.js`. Commit 6cce610+wip.
+
+| UTC | Strategy | median (ms) | mean (ms) | p95 (ms) | max (ms) | notes |
+|-----|----------|-------------|-----------|----------|----------|-------|
+| 2026-07-01T03:26Z | **reorder-nodes** ✅ | **282 (275–288)** | ~279 | ~320 | ~337 | move existing `<tr>` into sorted order via one DocumentFragment.appendChild; no re-parse; node identity + filter's `display` survive |
+| 2026-07-01T03:26Z | tbody-rebuild | 335 (333–340) | ~348 | ~420 | ~455 | `tbody.innerHTML = sortedRows`; re-parses 1506 rows; must re-query rows after |
+
+**Winner: reorder-nodes** — ~16% faster median and much tighter p95, and it composes with the
+resident-node filter (moving a node keeps its `display`). Sort is inherently costlier than the filter
+(~282 ms vs ~57 ms) because it genuinely reflows all rows, but it's a click interaction (not
+per-keystroke) so ~282 ms under 6× throttle (~47 ms unthrottled) is fine. **Decision: ship sorting
+with the reorder-nodes strategy.** (This is the shipped "sort" interaction headline.)

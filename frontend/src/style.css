@@ -285,25 +285,104 @@ code {
 
 .stock-table th,
 .stock-table td {
-  padding: 6px 10px;
+  padding: var(--pad-comfortable); /* Comfortable density (~52px rows) — was 6px 10px */
   border-bottom: 1px solid var(--border);
+  vertical-align: top; /* top-align so the 2-line Name clamp reads correctly */
 }
 
 /* Sticky header: with ~1500 rows scrolling inside .table-wrap, keep the column
-   names pinned. The background hides rows sliding underneath. */
+   names pinned. The (opaque) #fafafc surface hides rows sliding underneath. */
 .stock-table thead th {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--bg);
+  background: var(--surface); /* #fafafc header tint (was --bg) */
   color: var(--text-strong);
   font-weight: var(--weight-header);
   border-bottom: 2px solid var(--border);
+  vertical-align: middle; /* header labels centred though body cells top-align */
 }
 
 .stock-table .num {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+.stock-table .ctr {
+  text-align: center;
+}
+
+/* Row hover — subtle full-row tint. On the <td> (not <tr>) so it never paints
+   over the sticky header, and tbody-scoped so hovering the header row is inert. */
+.stock-table tbody tr:hover td {
+  background: var(--surface);
+}
+
+/* Name column wraps to 2 lines then ellipsis, opting out of the table's nowrap.
+   max-width gives the clamp something to bound against on a nowrap/100% table. */
+.stock-table td.cell-name {
+  white-space: normal;
+  max-width: 28ch;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+
+/* Sortable header: a borderless <button> filling the padded th (keyboard/focus
+   for free). The arrow lives on ::after with a reserved 1em slot so the label
+   never shifts when it appears; only sort state is conveyed by colour + shape. */
+.stock-table th .th-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.stock-table th.num .th-sort {
+  justify-content: flex-end;
+  text-align: right;
+}
+.stock-table th.ctr .th-sort {
+  justify-content: center;
+  text-align: center;
+}
+.stock-table th .th-sort::after {
+  content: "";
+  display: inline-block;
+  width: 1em;
+  flex: none;
+  font-size: 0.85em;
+  line-height: 1;
+  text-align: center;
+  color: var(--text);
+}
+/* Sortable-but-inactive: faint up-arrow on hover/focus to advertise sortability. */
+.stock-table th[aria-sort="none"] .th-sort:hover::after,
+.stock-table th[aria-sort="none"] .th-sort:focus-visible::after {
+  content: "\25B2";
+  color: var(--text);
+  opacity: 0.5;
+}
+/* Active sorted column: solid orange arrow by direction. */
+.stock-table th[aria-sort="ascending"] .th-sort::after {
+  content: "\25B2";
+  color: var(--tmf-orange);
+}
+.stock-table th[aria-sort="descending"] .th-sort::after {
+  content: "\25BC";
+  color: var(--tmf-orange);
 }
 
 /* Below 600px the table is unreadable (17 cols), so it reflows to a stack of

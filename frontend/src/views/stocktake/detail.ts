@@ -7,7 +7,13 @@ import {
   type StocktakeLine,
 } from "../../data/stocktakes.ts";
 import { esc } from "../../components/html.ts";
-import { renderTable } from "../../components/table.ts";
+import {
+  renderTable,
+  sortRows,
+  columnKey,
+  isSortable,
+  type Column,
+} from "../../components/table.ts";
 import { lineColumns } from "./columns.ts";
 
 // page--table opts this view into the full-width, viewport-bounded table layout
@@ -21,8 +27,8 @@ export const render: View<"/stocktake/:id"> = (outlet, params) => {
   outlet.innerHTML = page(`<p class="muted">Loading…</p>`);
 
   let cancelled = false;
-  // Tears down the filter input listener + pending debounce on nav-away.
-  let teardownFilter: (() => void) | undefined;
+  // Tears down the filter + sort listeners and pending debounce on nav-away.
+  let teardown: (() => void) | undefined;
 
   getStocktake(params.id)
     .then((detail) => {
@@ -36,9 +42,6 @@ export const render: View<"/stocktake/:id"> = (outlet, params) => {
       }
       const { stocktake, lines, prefs } = detail;
 
-      // The whole view — header + table — is built as one string and assigned
-      // once. data-testid / data-ready land in the same write as the rows, so
-      // the perf collector stamps "data rendered" only when rows are on screen.
       const header =
         `<h1>${esc(stocktakeTitle(stocktake))}</h1>` +
         `<p>ID: <code>${esc(stocktake.id)}</code> · #${stocktake.stocktakeNumber}` +
@@ -46,16 +49,17 @@ export const render: View<"/stocktake/:id"> = (outlet, params) => {
         ` · created ${esc(new Date(stocktake.createdDatetime).toLocaleString())}</p>` +
         (stocktake.comment ? `<p>${esc(stocktake.comment)}</p>` : "");
 
-      const table = renderTable(lines, lineColumns(prefs), {
+      const cols = lineColumns(prefs);
+      const table = renderTable(lines, cols, {
         className: "stock-table",
         testId: "stocktake-table",
         ready: true,
         rowKey: (l) => l.id,
       });
 
-      // Search box + live count live ABOVE the table so filter updates never
-      // touch the input (focus/value survive). Left unstyled on purpose — the
-      // design-system "inputs" increment owns the presentation.
+      // Search box + live count live ABOVE the table so updates never touch the
+      // input (focus/value survive). Left unstyled on purpose — the design-system
+      // "inputs" increment owns the presentation.
       const toolbar =
         `<div class="stock-toolbar">` +
         `<input type="search" class="stock-filter"` +
@@ -71,7 +75,7 @@ export const render: View<"/stocktake/:id"> = (outlet, params) => {
             : `<p class="muted">No lines in this stocktake.</p>`),
       );
 
-      if (lines.length) teardownFilter = wireFilter(outlet, lines);
+      if (lines.length) teardown = wireTable(outlet, lines, cols);
     })
     .catch((error: unknown) => {
       if (cancelled) return;
@@ -81,53 +85,127 @@ export const render: View<"/stocktake/:id"> = (outlet, params) => {
 
   return () => {
     cancelled = true;
-    teardownFilter?.();
+    teardown?.();
   };
 };
 
-// Wire the client-side filter over the already-rendered rows. Uses the
-// row-visibility-toggle strategy (flip each <tr>'s inline display) — the
-// measured-cheapest update: ~57ms median / ~104ms p95 vs ~90/450ms for
-// rebuilding the tbody at 1506 rows (see docs/perf/interaction-runs.md). Purely
-// client-side over loaded data, so filtering fires no GraphQL requests.
-function wireFilter(outlet: HTMLElement, lines: readonly StocktakeLine[]): () => void {
+// Wire client-side filter + sort over the already-rendered rows. Both are pure
+// client-side over the loaded data — they fire NO GraphQL and never reload.
+//
+// - Filter: row-visibility toggle (flip each <tr>'s inline display) — the
+//   measured-cheapest update (~57ms median / ~104ms p95; docs/perf/interaction-runs.md).
+// - Sort: reorder the existing <tr> nodes into sorted order via one
+//   DocumentFragment.appendChild (the measured winner: ~282ms median vs ~335ms
+//   for a tbody rebuild). Because the SAME nodes move, each row's filter
+//   `display` rides along — so sort and filter compose without re-evaluating
+//   either. State is local (no store/library).
+function wireTable(
+  outlet: HTMLElement,
+  lines: readonly StocktakeLine[],
+  cols: readonly Column<StocktakeLine>[],
+): () => void {
+  const tableEl = outlet.querySelector<HTMLElement>('[data-testid="stocktake-table"]');
   const input = outlet.querySelector<HTMLInputElement>(".stock-filter");
   const countEl = outlet.querySelector<HTMLElement>(".stock-count");
-  const rowEls = Array.from(
-    outlet.querySelectorAll<HTMLElement>('[data-testid="stocktake-table"] tbody tr'),
-  );
-  if (!input || !countEl) return () => {};
+  const tbody = tableEl?.querySelector("tbody");
+  const thead = tableEl?.querySelector("thead");
+  if (!tableEl || !input || !countEl || !tbody || !thead) return () => {};
 
-  // rowEls[i] corresponds to lines[i]: renderTable emits rows in array order.
-  const haystacks = lines.map(lineHaystack);
+  // Row identity by line id (data-id) — robust to reordering (unlike array
+  // index). Both maps are built once.
+  const nodeById = new Map<string, HTMLElement>();
+  for (const tr of Array.from(tbody.children) as HTMLElement[]) {
+    if (tr.dataset.id) nodeById.set(tr.dataset.id, tr);
+  }
+  const haystackById = new Map(lines.map((l) => [l.id, lineHaystack(l)]));
+  const sortableByKey = new Map<string, Column<StocktakeLine>>();
+  for (const c of cols) if (isSortable(c)) sortableByKey.set(columnKey(c), c);
+
   const total = lines.length;
   const setCount = (shown: number) => {
     countEl.textContent = `Showing ${shown} of ${total}`;
   };
-  setCount(total);
 
-  const applyFilter = (raw: string) => {
-    const q = raw.trim().toLowerCase();
+  const view = { query: "", sortKey: null as string | null, sortDir: "asc" as "asc" | "desc" };
+
+  // Filter: toggle each row's display by the query; update the count. Order-
+  // independent, so it's unaffected by the current sort.
+  const applyFilter = () => {
+    const q = view.query.trim().toLowerCase();
     let shown = 0;
-    for (let i = 0; i < rowEls.length; i++) {
-      const match = q === "" || haystacks[i].includes(q);
+    for (const l of lines) {
+      const node = nodeById.get(l.id);
+      if (!node) continue;
+      const match = q === "" || (haystackById.get(l.id) ?? "").includes(q);
       const want = match ? "" : "none";
-      if (rowEls[i].style.display !== want) rowEls[i].style.display = want;
+      if (node.style.display !== want) node.style.display = want;
       if (match) shown++;
     }
     setCount(shown);
   };
 
-  // Debounce so a fast typist coalesces keystrokes into one update.
+  // Sort: reorder nodes into sorted (or natural) order. Nodes keep their
+  // display, so the filter's visibility survives — no re-filter needed, and the
+  // count is unchanged (same rows, reordered).
+  const applySort = () => {
+    const col = view.sortKey ? sortableByKey.get(view.sortKey) : undefined;
+    const ordered = col ? sortRows(lines, col, view.sortDir) : lines;
+    const frag = document.createDocumentFragment();
+    for (const l of ordered) {
+      const node = nodeById.get(l.id);
+      if (node) frag.appendChild(node); // appendChild MOVES the existing node
+    }
+    tbody.appendChild(frag); // one reflow
+  };
+
+  const updateAriaSort = () => {
+    for (const th of Array.from(thead.querySelectorAll<HTMLElement>("th[data-sort-key]"))) {
+      const active = th.dataset.sortKey === view.sortKey;
+      th.setAttribute(
+        "aria-sort",
+        active ? (view.sortDir === "asc" ? "ascending" : "descending") : "none",
+      );
+    }
+  };
+
+  // Filter input — debounced so fast typing coalesces into one update.
   let timer = 0;
   const onInput = () => {
     clearTimeout(timer);
-    timer = window.setTimeout(() => applyFilter(input.value), 120);
+    timer = window.setTimeout(() => {
+      view.query = input.value;
+      applyFilter();
+    }, 120);
   };
   input.addEventListener("input", onInput);
+
+  // Sort — one delegated listener on <thead>. The header control is a native
+  // <button>, so Enter/Space fire a click for free (no keydown handler).
+  // Cycle: asc → desc → none (so the natural/server order is reachable).
+  const onHeadClick = (e: Event) => {
+    const th = (e.target as HTMLElement).closest<HTMLElement>("th[data-sort-key]");
+    if (!th) return;
+    const key = th.dataset.sortKey;
+    if (!key) return;
+    if (view.sortKey !== key) {
+      view.sortKey = key;
+      view.sortDir = "asc";
+    } else if (view.sortDir === "asc") {
+      view.sortDir = "desc";
+    } else {
+      view.sortKey = null;
+      view.sortDir = "asc";
+    }
+    updateAriaSort();
+    applySort();
+  };
+  thead.addEventListener("click", onHeadClick);
+
+  setCount(total);
 
   return () => {
     clearTimeout(timer);
     input.removeEventListener("input", onInput);
+    thead.removeEventListener("click", onHeadClick);
   };
 }

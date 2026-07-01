@@ -1,96 +1,80 @@
 import type { Column } from "../../components/table.ts";
 import type { StocktakeLine, StocktakePrefs } from "../../data/stocktakes.ts";
 
-// One formatter instance, reused for every date cell — constructing an
-// Intl.DateTimeFormat per row is measurably expensive at scale.
-const dateFormat = new Intl.DateTimeFormat();
-
-// NaiveDate arrives as "YYYY-MM-DD" (or null). Blank when absent; falls back to
-// the raw string if it isn't a parseable date.
-function fmtDate(value: string | null | undefined): string {
-  if (!value) return "";
-  const d = new Date(value);
-  return isNaN(d.getTime()) ? value : dateFormat.format(d);
-}
-
-// Blank for a null number (e.g. a line not yet counted); otherwise the value.
-function num(value: number | null | undefined): string {
-  return value == null ? "" : String(value);
-}
-
 // Difference = (counted ?? snapshot) − snapshot. An uncounted line reads 0
-// (no change yet), matching open-mSupply's accessor.
+// (no change yet), matching open-mSupply's accessor. Always a number.
 function difference(l: StocktakeLine): number {
   return (l.countedNumberOfPacks ?? l.snapshotNumberOfPacks) - l.snapshotNumberOfPacks;
 }
 
 // Doses counted = counted packs × pack size × doses per unit — vaccines only,
-// and only once the line has been counted. Mirrors open-mSupply's accessor.
-function dosesCounted(l: StocktakeLine): string {
-  if (!l.item.isVaccine) return "";
+// and only once the line has been counted. Returns the raw number (or null when
+// N/A) so it both formats and SORTS as a number. Mirrors open-mSupply's accessor.
+function dosesCountedValue(l: StocktakeLine): number | null {
+  if (!l.item.isVaccine) return null;
   const counted = l.countedNumberOfPacks;
-  if (counted == null) return "";
-  return num(counted * (l.packSize || l.item.defaultPackSize || 1) * (l.item.doses ?? 1));
+  if (counted == null) return null;
+  return counted * (l.packSize || l.item.defaultPackSize || 1) * (l.item.doses ?? 1);
 }
 
 // The stocktake-line columns, in the same order open-mSupply renders them
-// (client/packages/inventory/src/Stocktake/DetailView/columns.tsx). The three
-// preference-gated columns use `include` so they vanish when the store pref is
-// off. Every `l.*` access is checked against the generated StocktakeLine type.
+// (client/packages/inventory/src/Stocktake/DetailView/columns.tsx). Each column
+// declares its `kind` (data type) — the single source of truth for alignment,
+// tabular-nums, formatting, and the sort comparator — plus a typed `value`
+// accessor (a field typo is a compile error). `card` slots drive the <600px card
+// layout; three columns are preference-gated via `include`. Nullable accessors
+// end in `?? null` so blanks render "" and sort last.
 export function lineColumns(prefs: StocktakePrefs): Column<StocktakeLine>[] {
   const { manageVaccinesInDoses, allowTrackingOfStockByDonor } = prefs;
-  // `card` slots drive the <600px card layout (see style.css). Identity up top
-  // (title/subtitle), Difference as the badge, key fields in the grid; columns
-  // without a slot are hidden on the card.
   return [
-    { header: "Code", card: "subtitle", cell: (l) => l.item.code },
-    { header: "Name", card: "title", cell: (l) => l.itemName },
-    { header: "Batch", card: "grid", cell: (l) => l.batch ?? "" },
-    { header: "Expiry Date", card: "grid", cell: (l) => fmtDate(l.expiryDate) },
-    { header: "Manufacture Date", cell: (l) => fmtDate(l.manufactureDate) },
-    { header: "Location", card: "grid", cell: (l) => l.location?.code ?? "" },
-    { header: "Unit Name", cell: (l) => l.item.unitName ?? "" },
-    { header: "Pack Size", align: "right", cell: (l) => num(l.packSize) },
+    { header: "Code", card: "subtitle", value: (l) => l.item.code },
+    { header: "Name", cellClass: "cell-name", card: "title", value: (l) => l.itemName },
+    { header: "Batch", card: "grid", value: (l) => l.batch ?? null },
+    { header: "Expiry Date", kind: "date", card: "grid", value: (l) => l.expiryDate ?? null },
+    { header: "Manufacture Date", kind: "date", value: (l) => l.manufactureDate ?? null },
+    { header: "Location", card: "grid", value: (l) => l.location?.code ?? null },
+    { header: "Unit Name", value: (l) => l.item.unitName ?? null },
+    { header: "Pack Size", kind: "number", value: (l) => l.packSize ?? null },
     {
       header: "Doses Per Unit",
-      align: "right",
+      kind: "number",
       include: manageVaccinesInDoses,
-      cell: (l) => (l.item.isVaccine ? num(l.item.doses) : ""),
+      value: (l) => (l.item.isVaccine ? l.item.doses : null),
     },
     {
       header: "Snapshot # Packs",
-      align: "right",
+      kind: "number",
       card: "grid",
-      cell: (l) => num(l.snapshotNumberOfPacks),
+      value: (l) => l.snapshotNumberOfPacks,
     },
     {
       header: "Counted # Packs",
-      align: "right",
+      kind: "number",
       card: "grid",
-      cell: (l) => num(l.countedNumberOfPacks),
+      value: (l) => l.countedNumberOfPacks ?? null,
     },
     {
       header: "Doses Counted",
-      align: "right",
+      kind: "number",
+      key: "dosesCounted",
       include: manageVaccinesInDoses,
-      cell: dosesCounted,
+      value: dosesCountedValue,
     },
     {
       header: "Difference",
-      align: "right",
+      kind: "number",
+      key: "difference",
       card: "badge",
-      cell: (l) => {
-        const d = difference(l);
-        return d > 0 ? `+${d}` : String(d);
-      },
+      value: difference,
+      format: (v) => (typeof v === "number" && v > 0 ? `+${v}` : String(v ?? "")),
     },
-    { header: "Reason", card: "grid", cell: (l) => l.reasonOption?.reason ?? "" },
+    { header: "Reason", card: "grid", value: (l) => l.reasonOption?.reason ?? null },
     {
       header: "Donor",
       include: allowTrackingOfStockByDonor,
-      cell: (l) => l.donorName ?? "",
+      value: (l) => l.donorName ?? null,
     },
-    { header: "Manufacturer", card: "grid", cell: (l) => l.manufacturer?.name ?? "" },
-    { header: "Comment", cell: (l) => l.comment ?? "" },
+    { header: "Manufacturer", card: "grid", value: (l) => l.manufacturer?.name ?? null },
+    { header: "Comment", value: (l) => l.comment ?? null },
   ];
 }
