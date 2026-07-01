@@ -157,10 +157,14 @@ export function renderRows<T>(
   columns: readonly Column<T>[],
   opts: Pick<TableOptions<T>, "rowKey"> = {},
 ): Html {
+  // Respect `include` here too (not just in renderTable) so a single-row
+  // re-render (e.g. after an edit) yields the SAME columns as the header —
+  // otherwise preference-gated columns would reappear and misalign the row.
+  const cols = columns.filter((c) => c.include !== false);
   return rows
     .map((row) => {
       const key = opts.rowKey ? ` data-id="${esc(opts.rowKey(row))}"` : "";
-      const cells = columns
+      const cells = cols
         .map((c) => {
           let content: Html;
           if (c.html) {

@@ -665,3 +665,123 @@ code {
 .toast--leaving {
   opacity: 0;
 }
+
+/* Editable table: rows are clickable to open the edit modal. */
+.stock-table--editable tbody tr {
+  cursor: pointer;
+}
+
+/* Edit-line modal (step 6) — native <dialog>. Panel + dimmed backdrop, using the
+   design tokens. Form fields reuse the input standard (see .field-input). */
+dialog.modal {
+  width: min(480px, calc(100vw - 2 * var(--space-4)));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0;
+  background: var(--bg);
+  color: var(--text-strong);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.18);
+}
+dialog.modal::backdrop {
+  background: rgb(28 28 40 / 0.4);
+}
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  margin: 0;
+}
+.modal-title {
+  margin: 0;
+  font-size: 18px;
+}
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.modal-context {
+  color: var(--text);
+  font-size: var(--text-size-sm);
+}
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.form-field > span {
+  font-size: var(--text-size-sm);
+  color: var(--text);
+}
+.form-error {
+  margin: 0;
+  color: var(--error);
+  font-size: var(--text-size-sm);
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* Form inputs — same shadcn/mSupply standard as the filter box (.stock-filter):
+   1px border, 6px radius, 14px text, 3px orange focus glow. Text inputs are 40px
+   tall; the comment textarea grows. */
+.field-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text-strong);
+  font: inherit;
+}
+input.field-input {
+  height: var(--input-h);
+}
+textarea.field-input {
+  padding: var(--space-2) var(--space-3);
+  resize: vertical;
+}
+.field-input::placeholder {
+  color: var(--text);
+}
+.field-input:focus-visible {
+  outline: none;
+  border-color: var(--tmf-orange);
+  box-shadow: 0 0 0 3px var(--tmf-orange-bg);
+}
+
+/* Modal footer buttons. Save = orange primary; Cancel = quiet. */
+.modal-save,
+.modal-cancel {
+  height: var(--input-h);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius);
+  font: inherit;
+  font-weight: var(--weight-header);
+  cursor: pointer;
+}
+.modal-save {
+  border: 1px solid var(--tmf-orange);
+  background: var(--tmf-orange);
+  color: #fff;
+}
+.modal-save:hover:not(:disabled) {
+  background: var(--tmf-orange-strong);
+  border-color: var(--tmf-orange-strong);
+}
+.modal-save:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.modal-cancel {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-strong);
+}
+.modal-cancel:hover {
+  background: var(--surface);
+}

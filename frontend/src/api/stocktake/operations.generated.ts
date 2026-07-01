@@ -33,6 +33,14 @@ export type DeleteStocktakeLinesMutationVariables = Types.Exact<{
 
 export type DeleteStocktakeLinesMutation = { __typename: 'Mutations', batchStocktake: { __typename: 'BatchStocktakeResponse', deleteStocktakeLines?: Array<{ __typename: 'DeleteStocktakeLineResponseWithId', id: string, response: { __typename: 'DeleteResponse', id: string } | { __typename: 'DeleteStocktakeLineError', error: { __typename: 'CannotEditStocktake', description: string } } }> | null } };
 
+export type UpdateStocktakeLineMutationVariables = Types.Exact<{
+  storeId: Types.Scalars['String']['input'];
+  input?: Types.InputMaybe<Array<Types.UpdateStocktakeLineInput> | Types.UpdateStocktakeLineInput>;
+}>;
+
+
+export type UpdateStocktakeLineMutation = { __typename: 'Mutations', batchStocktake: { __typename: 'BatchStocktakeResponse', updateStocktakeLines?: Array<{ __typename: 'UpdateStocktakeLineResponseWithId', id: string, response: { __typename: 'StocktakeLineNode', id: string, itemName: string, batch?: string | null, expiryDate?: string | null, manufactureDate?: string | null, packSize?: number | null, snapshotNumberOfPacks: number, countedNumberOfPacks?: number | null, comment?: string | null, donorName?: string | null, location?: { __typename: 'LocationNode', code: string } | null, item: { __typename: 'ItemNode', code: string, unitName?: string | null, isVaccine: boolean, doses: number, defaultPackSize: number }, reasonOption?: { __typename: 'ReasonOptionNode', reason: string } | null, manufacturer?: { __typename: 'NameNode', name: string } | null } | { __typename: 'UpdateStocktakeLineError', error: { __typename: 'AdjustmentReasonNotProvided', description: string } | { __typename: 'AdjustmentReasonNotValid', description: string } | { __typename: 'CannotEditStocktake', description: string } | { __typename: 'SnapshotCountCurrentCountMismatchLine', description: string } | { __typename: 'StockLineReducedBelowZero', description: string } } }> | null } };
+
 export class TypedDocumentString<TResult, TVariables>
   extends String
   implements DocumentTypeDecoration<TResult, TVariables>
@@ -259,3 +267,54 @@ export const DeleteStocktakeLinesDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<DeleteStocktakeLinesMutation, DeleteStocktakeLinesMutationVariables>;
+export const UpdateStocktakeLineDocument = new TypedDocumentString(`
+    mutation updateStocktakeLine($storeId: String!, $input: [UpdateStocktakeLineInput!]) {
+  batchStocktake(storeId: $storeId, input: {updateStocktakeLines: $input}) {
+    __typename
+    ... on BatchStocktakeResponse {
+      updateStocktakeLines {
+        id
+        response {
+          __typename
+          ... on StocktakeLineNode {
+            ...StocktakeLine
+          }
+          ... on UpdateStocktakeLineError {
+            error {
+              description
+            }
+          }
+        }
+      }
+    }
+  }
+}
+    fragment StocktakeLine on StocktakeLineNode {
+  __typename
+  id
+  itemName
+  batch
+  expiryDate
+  manufactureDate
+  packSize
+  snapshotNumberOfPacks
+  countedNumberOfPacks
+  comment
+  donorName
+  location {
+    code
+  }
+  item {
+    code
+    unitName
+    isVaccine
+    doses
+    defaultPackSize
+  }
+  reasonOption {
+    reason
+  }
+  manufacturer(storeId: $storeId) {
+    name
+  }
+}`) as unknown as TypedDocumentString<UpdateStocktakeLineMutation, UpdateStocktakeLineMutationVariables>;

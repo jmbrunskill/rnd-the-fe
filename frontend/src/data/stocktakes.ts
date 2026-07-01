@@ -3,6 +3,7 @@ import {
   DeleteStocktakeLinesDocument,
   StocktakeDocument,
   StocktakesDocument,
+  UpdateStocktakeLineDocument,
   type StocktakeFragment,
   type StocktakeLineFragment,
   type StocktakeRowFragment,
@@ -151,4 +152,30 @@ export async function deleteStocktakeLines(ids: string[]): Promise<DeleteResult>
     else errors.push({ id: line.id, message: line.response.error.description });
   }
   return { deleted, errors };
+}
+
+// The editable fields of one stocktake line (the modal's form). All optional —
+// only what changed need be sent.
+export interface LineEdit {
+  countedNumberOfPacks?: number | null;
+  batch?: string | null;
+  comment?: string | null;
+}
+
+// Update one line. On success the server returns the full updated line
+// (…StocktakeLine), so the caller re-renders that row from `line` — no refetch.
+// A per-line business error (e.g. an adjustment needing a reason) comes back as
+// `error`; transport/GraphQL-level failures throw out of gqlRequest.
+export async function updateStocktakeLine(
+  id: string,
+  edit: LineEdit,
+): Promise<{ line?: StocktakeLine; error?: string }> {
+  const { batchStocktake } = await gqlRequest(UpdateStocktakeLineDocument, {
+    storeId: STORE_ID,
+    input: [{ id, ...edit }],
+  });
+  const result = batchStocktake.updateStocktakeLines?.[0];
+  if (!result) return { error: "No response from server" };
+  if (result.response.__typename === "StocktakeLineNode") return { line: result.response };
+  return { error: result.response.error.description };
 }

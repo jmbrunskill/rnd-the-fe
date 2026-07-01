@@ -10,12 +10,14 @@ import {
 import { esc, html } from "../../components/html.ts";
 import {
   renderTable,
+  renderRows,
   sortRows,
   columnKey,
   isSortable,
   type Column,
 } from "../../components/table.ts";
 import { lineColumns } from "./columns.ts";
+import { openLineEdit } from "./line-edit.ts";
 import { toast } from "../../components/toast.ts";
 import { queryParams, setQuery } from "../../url.ts";
 
@@ -71,7 +73,8 @@ export const render: View<"/stocktake/:id"> = (outlet, params) => {
 
       const cols = editable ? [selectCol, ...lineColumns(prefs)] : lineColumns(prefs);
       const table = renderTable(lines, cols, {
-        className: "stock-table",
+        // --editable marks rows clickable-to-edit (cursor hint in CSS).
+        className: editable ? "stock-table stock-table--editable" : "stock-table",
         testId: "stocktake-table",
         ready: true,
         rowKey: (l) => l.id,
@@ -98,7 +101,7 @@ export const render: View<"/stocktake/:id"> = (outlet, params) => {
             : `<p class="muted">No lines in this stocktake.</p>`),
       );
 
-      if (lines.length) teardown = wireTable(outlet, lines, cols);
+      if (lines.length) teardown = wireTable(outlet, lines, cols, editable);
     })
     .catch((error: unknown) => {
       if (cancelled) return;
@@ -126,6 +129,7 @@ function wireTable(
   outlet: HTMLElement,
   lines: readonly StocktakeLine[],
   cols: readonly Column<StocktakeLine>[],
+  editable: boolean,
 ): () => void {
   const tableEl = outlet.querySelector<HTMLElement>('[data-testid="stocktake-table"]');
   const input = outlet.querySelector<HTMLInputElement>(".stock-filter");
@@ -337,6 +341,39 @@ function wireTable(
   };
   deleteBtn?.addEventListener("click", onDelete);
 
+  // --- edit (row click → modal), editable stocktakes only. On save the server
+  // returns the full updated line, so we re-render just that <tr> in place — no
+  // refetch (this is roadmap step 7). ---
+  const onSaved = (updated: StocktakeLine) => {
+    const i = current.findIndex((l) => l.id === updated.id);
+    if (i === -1) return;
+    current[i] = updated;
+    haystackById.set(updated.id, lineHaystack(updated));
+    // Parse the fresh <tr> via a full <table> wrapper — a detached <tbody>
+    // doesn't reliably parse a bare <tr> through innerHTML.
+    const holder = document.createElement("table");
+    holder.innerHTML = `<tbody>${renderRows([updated], cols, { rowKey: (l) => l.id })}</tbody>`;
+    const newTr = holder.querySelector("tr");
+    const oldTr = nodeById.get(updated.id);
+    if (!newTr || !oldTr) return;
+    oldTr.replaceWith(newTr);
+    nodeById.set(updated.id, newTr);
+    // The fresh row is unselected/unfiltered — restore both.
+    if (selected.has(updated.id)) setRowSelected(newTr, updated.id, true);
+    applyFilter();
+  };
+
+  const onRowClick = (e: Event) => {
+    const target = e.target as HTMLElement;
+    // Ignore the checkbox cell + any interactive control (they do their own thing).
+    if (target.closest(".col-select, a, button, input, textarea, select")) return;
+    const id = target.closest<HTMLElement>("tr")?.dataset.id;
+    if (!id) return;
+    const line = current.find((l) => l.id === id);
+    if (line) openLineEdit(line, onSaved);
+  };
+  if (editable) tbody.addEventListener("click", onRowClick);
+
   // Restore filter + sort from the URL on mount (deep link / refresh / browser
   // back into this view). Invalid/stale ?sort keys are ignored.
   const p = queryParams();
@@ -359,6 +396,7 @@ function wireTable(
     input.removeEventListener("input", onInput);
     thead.removeEventListener("click", onHeadClick);
     tbody.removeEventListener("change", onRowChange);
+    tbody.removeEventListener("click", onRowClick);
     selectAll?.removeEventListener("change", onSelectAll);
     deleteBtn?.removeEventListener("click", onDelete);
   };

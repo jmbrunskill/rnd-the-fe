@@ -115,3 +115,28 @@ mutation deleteStocktakeLines($storeId: String!, $ids: [DeleteStocktakeLineInput
     }
   }
 }
+
+# Update one (or more) stocktake lines. On success the batch response returns the
+# full updated StocktakeLineNode (…StocktakeLine), so the caller re-renders that
+# row from the response — no refetch. Errors come back per id.
+mutation updateStocktakeLine($storeId: String!, $input: [UpdateStocktakeLineInput!]) {
+  batchStocktake(storeId: $storeId, input: { updateStocktakeLines: $input }) {
+    __typename
+    ... on BatchStocktakeResponse {
+      updateStocktakeLines {
+        id
+        response {
+          __typename
+          ... on StocktakeLineNode {
+            ...StocktakeLine
+          }
+          ... on UpdateStocktakeLineError {
+            error {
+              description
+            }
+          }
+        }
+      }
+    }
+  }
+}
