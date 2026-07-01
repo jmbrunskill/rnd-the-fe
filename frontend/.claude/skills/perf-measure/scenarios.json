@@ -1,0 +1,29 @@
+{
+  "app": {
+    "baseUrl": "http://localhost:4173",
+    "buildCommand": "npm run build",
+    "serveCommand": "npm run preview -- --port 4173 --strictPort",
+    "readyProbeUrl": "http://localhost:4173/",
+    "credsFile": "perf.local.json"
+  },
+  "defaults": {
+    "runs": 5,
+    "dropFirst": true,
+    "cpuThrottle": 6,
+    "network": "none",
+    "cache": "warm",
+    "netQuietMs": 500,
+    "collectTimeoutMs": 20000,
+    "resultsDoc": "docs/perf/frontend-runs.html",
+    "snapshotDir": "docs/perf/snapshots"
+  },
+  "scenarios": [
+    {
+      "name": "stocktake-detail-baseline",
+      "path": "/stocktake/019f17d0-1444-795c-ac53-da2216c73cff",
+      "readySignal": "[data-testid=\"stocktake-table\"][data-ready=\"true\"]",
+      "dataItemCountSelector": "[data-testid=\"stocktake-table\"] tbody tr",
+      "dataRequestUrlPattern": "/graphql"
+    }
+  ]
+}

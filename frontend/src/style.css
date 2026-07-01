@@ -350,3 +350,33 @@ code {
     padding: 24px 20px;
   }
 }
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+
+  li {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+  }
+
+  a {
+    color: var(--accent);
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.muted {
+  color: var(--text);
+  font-size: 15px;
+}

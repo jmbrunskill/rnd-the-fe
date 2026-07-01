@@ -15,7 +15,13 @@ export function renderNav(currentPath: string) {
     mounted = true;
   }
   el.querySelectorAll<HTMLAnchorElement>("a").forEach((a) => {
-    const active = a.getAttribute("href") === currentPath;
+    const href = a.getAttribute("href")!;
+    // Light up the parent link on nested routes, e.g. "/stocktake/st-1001"
+    // keeps the "/stocktake" link active. "/" only matches exactly.
+    const active =
+      href === "/"
+        ? currentPath === "/"
+        : currentPath === href || currentPath.startsWith(href + "/");
     a.classList.toggle("active", active);
     a.toggleAttribute("aria-current", active); // a11y: marks the current page
   });

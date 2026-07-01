@@ -1,0 +1,29 @@
+{
+  "_README": "Copy to perf.local.json (which is gitignored) and fill in only what your app needs to reach the measured page. This file holds anything secret or host-specific so it never lands in git or the results doc. Every field is OPTIONAL — delete what you don't use. This demo currently needs NONE of it (no login), so perf.local.json is just {}.",
+
+  "extraHttpHeaders": {
+    "_doc": "Sent on every request via emulate(extraHttpHeaders). Use for token auth.",
+    "Authorization": "Bearer <token>"
+  },
+
+  "cookies": [
+    {
+      "_doc": "Set before navigating (e.g. a session cookie).",
+      "name": "session",
+      "value": "<value>",
+      "domain": "localhost",
+      "path": "/"
+    }
+  ],
+
+  "login": {
+    "_doc": "If the app needs a form login, the skill fills + submits it before measuring.",
+    "path": "/login",
+    "usernameSelector": "#username",
+    "passwordSelector": "#password",
+    "submitSelector": "button[type=submit]",
+    "successSignal": "text:Dashboard",
+    "username": "<user>",
+    "password": "<password>"
+  }
+}

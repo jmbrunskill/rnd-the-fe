@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# perf-measure: local creds (never commit) + heap snapshots (kept out of git)
+perf.local.json
+**/perf.local.json
+docs/perf/snapshots/
+*.heapsnapshot
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

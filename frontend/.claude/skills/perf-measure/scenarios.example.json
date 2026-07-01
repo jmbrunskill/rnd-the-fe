@@ -1,0 +1,32 @@
+{
+  "_README": "Template for scenarios.json. Copy this file to scenarios.json and edit. scenarios.json IS committed (it's shared config, no secrets). Anything secret or host-specific goes in perf.local.json (gitignored). See README.md.",
+  "app": {
+    "_doc": "How to build/serve the app for measurement, and how to reach it.",
+    "baseUrl": "http://localhost:5174",
+    "buildCommand": "npm run build",
+    "serveCommand": "npm run preview -- --port 5174 --strictPort",
+    "readyProbeUrl": "http://localhost:5174/",
+    "credsFile": "perf.local.json"
+  },
+  "defaults": {
+    "runs": 5,
+    "dropFirst": true,
+    "cpuThrottle": 6,
+    "network": "none",
+    "cache": "warm",
+    "netQuietMs": 500,
+    "collectTimeoutMs": 20000,
+    "resultsDoc": "docs/perf/frontend-runs.html",
+    "snapshotDir": "docs/perf/snapshots"
+  },
+  "scenarios": [
+    {
+      "_doc": "name: short id used in the results row + as the skill argument. path: route to navigate to. readySignal: CSS selector OR 'text:<string>' marking real content on screen. dataItemCountSelector: elements counted as 'data items' (e.g. table rows). dataRequestUrlPattern: substring of your data-call URLs (e.g. '/graphql', '/api/').",
+      "name": "stocktake-detail-baseline",
+      "path": "/stocktake/<some-id>",
+      "readySignal": "[data-testid=\"stocktake-table\"][data-ready=\"true\"]",
+      "dataItemCountSelector": "[data-testid=\"stocktake-table\"] tbody tr",
+      "dataRequestUrlPattern": "/graphql"
+    }
+  ]
+}

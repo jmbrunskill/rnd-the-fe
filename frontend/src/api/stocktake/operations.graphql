@@ -1,0 +1,29 @@
+fragment StocktakeRow on StocktakeNode {
+  __typename
+  id
+  comment
+  description
+  createdDatetime
+  finalisedDatetime
+  stocktakeNumber
+  status
+  isLocked
+  isInitialStocktake
+}
+
+query stocktakes(
+  $storeId: String!
+  $filter: StocktakeFilterInput
+  $page: PaginationInput
+  $sort: [StocktakeSortInput!]
+) {
+  stocktakes(storeId: $storeId, filter: $filter, page: $page, sort: $sort) {
+    __typename
+    ... on StocktakeConnector {
+      totalCount
+      nodes {
+        ...StocktakeRow
+      }
+    }
+  }
+}
