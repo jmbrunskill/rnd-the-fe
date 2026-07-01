@@ -4,8 +4,10 @@ import { esc } from "../../components/html.ts";
 import { renderTable } from "../../components/table.ts";
 import { lineColumns } from "./columns.ts";
 
+// page--table opts this view into the full-width, viewport-bounded table layout
+// (edge-to-edge, internal scroll region) instead of the centered .page column.
 const page = (body: string) =>
-  `<section class="page"><p><a href="/stocktake">← Back to stocktakes</a></p>${body}</section>`;
+  `<section class="page page--table"><p><a href="/stocktake">← Back to stocktakes</a></p>${body}</section>`;
 
 // params is typed { id: string }, derived from the "/stocktake/:id" pattern.
 // Accessing params.idd (or any name not in the pattern) is a compile error.

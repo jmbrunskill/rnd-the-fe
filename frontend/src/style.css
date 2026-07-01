@@ -52,6 +52,13 @@
 
 body {
   margin: 0;
+  /* Viewport-height flex column: nav takes its height, #app fills the rest.
+     A definite height (not just min-height) is what lets a page bound an
+     internal scroll region to the viewport — see .page--table. Pages that opt
+     out (min-height:auto) simply overflow and scroll the document as usual. */
+  height: 100svh;
+  display: flex;
+  flex-direction: column;
 }
 
 h1,
@@ -156,13 +163,12 @@ code {
   }
 }
 
+/* #app is now the full-width shell that fills the viewport below the nav; each
+   page decides its own width (.page centers a 1126px column; .page--table goes
+   edge to edge). min-height:0 lets a child scroll region bound to the viewport. */
 #app {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
@@ -298,6 +304,7 @@ code {
 /* --- Nav bar + routed views ----------------------------------------- */
 
 #nav {
+  flex: none;
   border-bottom: 1px solid var(--border);
 }
 
@@ -339,6 +346,12 @@ code {
 
 .page {
   flex-grow: 1;
+  width: 1126px;
+  max-width: 100%;
+  margin-inline: auto;
+  box-sizing: border-box;
+  text-align: center;
+  border-inline: 1px solid var(--border);
   padding: 32px;
   display: flex;
   flex-direction: column;
@@ -349,6 +362,37 @@ code {
   @media (max-width: 1024px) {
     padding: 24px 20px;
   }
+}
+
+/* The stocktake detail: a wide data table. Goes edge to edge and left-aligned,
+   and becomes the bounded flex parent so .table-wrap can fill the viewport and
+   scroll internally (both axes) rather than the whole document scrolling. */
+.page--table {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+  border-inline: none;
+  text-align: left;
+  align-items: stretch;
+  place-content: start;
+  gap: 12px;
+  padding: 16px 24px;
+  min-height: 0;
+
+  @media (max-width: 1024px) {
+    padding: 12px 16px;
+  }
+}
+
+/* Reclaim vertical space for the table: the shell's 56px h1 + margins would
+   eat most of the bounded region. Spacing is handled by the .page gap. */
+.page--table h1 {
+  font-size: 28px;
+  letter-spacing: -0.5px;
+  margin: 0;
+}
+.page--table > p {
+  margin: 0;
 }
 
 .list {
@@ -381,12 +425,18 @@ code {
   font-size: 15px;
 }
 
-/* Stocktake detail lines table. 17 columns is wide, so the wrapper scrolls
-   horizontally rather than overflowing the page. `.page` centers its children,
-   hence width:100% + text-align:left to left-align the grid. */
+/* Stocktake detail lines table. 17 columns is wide and there are ~1500 rows, so
+   the wrapper is a bounded scroll region (flex-fills the viewport height inside
+   .page--table, min-height:0 lets it shrink to fit). Scrolling both axes stays
+   inside this box, so the horizontal scrollbar is always in view — you no longer
+   have to scroll to the bottom of the page to reach it. */
 .table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
   width: 100%;
-  overflow-x: auto;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
 .stock-table {
@@ -403,7 +453,13 @@ code {
   border-bottom: 1px solid var(--border);
 }
 
+/* Sticky header: with ~1500 rows scrolling inside .table-wrap, keep the column
+   names pinned. The background hides rows sliding underneath. */
 .stock-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg);
   color: var(--text-h);
   font-weight: 500;
   border-bottom: 2px solid var(--border);
