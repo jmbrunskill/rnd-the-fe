@@ -17,6 +17,11 @@ const sharedConfig = {
   // string-literal union types, and type imports are emitted as `import type`.
   enumsAsTypes: true,
   useTypeImports: true,
+  // Emit each operation as a pre-printed query *string* (wrapped in a generated
+  // `TypedDocumentString` class) instead of a parsed AST object. This prints the
+  // query once, here at build time, so the browser bundle ships neither the
+  // verbose AST JSON nor graphql-js's `print` — see src/api/request.ts.
+  documentMode: "string",
 };
 
 // This mirrors open-mSupply's codegen approach: one base-types file from the
