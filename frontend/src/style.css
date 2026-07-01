@@ -380,3 +380,36 @@ code {
   color: var(--text);
   font-size: 15px;
 }
+
+/* Stocktake detail lines table. 17 columns is wide, so the wrapper scrolls
+   horizontally rather than overflowing the page. `.page` centers its children,
+   hence width:100% + text-align:left to left-align the grid. */
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.stock-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.stock-table th,
+.stock-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.stock-table thead th {
+  color: var(--text-h);
+  font-weight: 500;
+  border-bottom: 2px solid var(--border);
+}
+
+.stock-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

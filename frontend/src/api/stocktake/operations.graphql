@@ -27,3 +27,65 @@ query stocktakes(
     }
   }
 }
+
+# One line in a stocktake. Only the fields the detail table renders are selected
+# — a smaller payload, and the fragment type documents exactly what the view
+# consumes (reading an unselected field is a compile error). `donorName` is a
+# flat scalar on the node; `manufacturer(storeId:)` is a per-line resolver.
+fragment StocktakeLine on StocktakeLineNode {
+  __typename
+  id
+  itemName
+  batch
+  expiryDate
+  manufactureDate
+  packSize
+  snapshotNumberOfPacks
+  countedNumberOfPacks
+  comment
+  donorName
+  location {
+    code
+  }
+  item {
+    code
+    unitName
+    isVaccine
+    doses
+    defaultPackSize
+  }
+  reasonOption {
+    reason
+  }
+  manufacturer(storeId: $storeId) {
+    name
+  }
+}
+
+# The detail object: the shared header fields (reused from StocktakeRow) plus the
+# full set of lines. Fetched in one round trip so the table has everything.
+fragment Stocktake on StocktakeNode {
+  __typename
+  ...StocktakeRow
+  lines {
+    totalCount
+    nodes {
+      ...StocktakeLine
+    }
+  }
+}
+
+# Header + lines + the two store preferences that gate optional columns, all in a
+# single request (`preferences` is a second root field, not a second round trip).
+query stocktake($stocktakeId: String!, $storeId: String!) {
+  stocktake(id: $stocktakeId, storeId: $storeId) {
+    __typename
+    ... on StocktakeNode {
+      ...Stocktake
+    }
+  }
+  preferences(storeId: $storeId) {
+    manageVaccinesInDoses
+    allowTrackingOfStockByDonor
+  }
+}

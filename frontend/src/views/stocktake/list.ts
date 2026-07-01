@@ -3,15 +3,16 @@ import {
   fetchStocktakes,
   statusLabel,
   stocktakeTitle,
-  type Stocktake,
+  type StocktakeRow,
 } from "../../data/stocktakes.ts";
+import { esc } from "../../components/html.ts";
 
 const page = (body: string) => `<section class="page"><h1>Stocktakes</h1>${body}</section>`;
 
-const row = (s: Stocktake) =>
-  `<li><a href="/stocktake/${s.id}">${stocktakeTitle(s)}</a>` +
-  ` <span class="muted">#${s.stocktakeNumber} · ${statusLabel(s.status)}` +
-  ` · ${new Date(s.createdDatetime).toLocaleDateString()}</span></li>`;
+const row = (s: StocktakeRow) =>
+  `<li><a href="/stocktake/${esc(s.id)}">${esc(stocktakeTitle(s))}</a>` +
+  ` <span class="muted">#${s.stocktakeNumber} · ${esc(statusLabel(s.status))}` +
+  ` · ${esc(new Date(s.createdDatetime).toLocaleDateString())}</span></li>`;
 
 export const render: View<"/stocktake"> = (outlet) => {
   outlet.innerHTML = page(`<p class="muted">Loading…</p>`);

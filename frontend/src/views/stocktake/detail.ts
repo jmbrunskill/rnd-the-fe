@@ -1,5 +1,8 @@
 import type { View } from "../../router.ts";
 import { getStocktake, statusLabel, stocktakeTitle } from "../../data/stocktakes.ts";
+import { esc } from "../../components/html.ts";
+import { renderTable } from "../../components/table.ts";
+import { lineColumns } from "./columns.ts";
 
 const page = (body: string) =>
   `<section class="page"><p><a href="/stocktake">← Back to stocktakes</a></p>${body}</section>`;
@@ -12,36 +15,44 @@ export const render: View<"/stocktake/:id"> = (outlet, params) => {
   let cancelled = false;
 
   getStocktake(params.id)
-    .then((stocktake) => {
+    .then((detail) => {
       if (cancelled) return;
-      if (!stocktake) {
+      if (!detail) {
         outlet.innerHTML = page(
           `<h1>Stocktake not found</h1>` +
-            `<p>No stocktake with id <code>${params.id}</code>.</p>`,
+            `<p>No stocktake with id <code>${esc(params.id)}</code>.</p>`,
         );
         return;
       }
+      const { stocktake, lines, prefs } = detail;
+
+      // The whole view — header + table — is built as one string and assigned
+      // once. data-testid / data-ready land in the same write as the rows, so
+      // the perf collector stamps "data rendered" only when rows are on screen.
+      const header =
+        `<h1>${esc(stocktakeTitle(stocktake))}</h1>` +
+        `<p>ID: <code>${esc(stocktake.id)}</code> · #${stocktake.stocktakeNumber}` +
+        ` · ${esc(statusLabel(stocktake.status))}` +
+        ` · created ${esc(new Date(stocktake.createdDatetime).toLocaleString())}</p>` +
+        (stocktake.comment ? `<p>${esc(stocktake.comment)}</p>` : "");
+
+      const table = renderTable(lines, lineColumns(prefs), {
+        className: "stock-table",
+        testId: "stocktake-table",
+        ready: true,
+        rowKey: (l) => l.id,
+      });
+
       outlet.innerHTML = page(
-        `<h1>${stocktakeTitle(stocktake)}</h1>` +
-          `<p>ID: <code>${stocktake.id}</code> · #${stocktake.stocktakeNumber}` +
-          ` · ${statusLabel(stocktake.status)}` +
-          ` · created ${new Date(stocktake.createdDatetime).toLocaleString()}</p>` +
-          (stocktake.comment ? `<p>${stocktake.comment}</p>` : "") +
-          // Stocktake-lines table. Rendered only once the data has loaded, with a
-          // data-ready hook so perf tooling can stamp "real content on screen"
-          // (see .claude/skills/perf-measure). Rows are populated in a later
-          // iteration; for now it's an intentionally empty baseline (0 rows).
-          `<table class="stock-table" data-testid="stocktake-table" data-ready="true">` +
-          `<thead><tr><th>Item</th><th>Code</th><th>Batch</th><th>Expiry</th>` +
-          `<th>Snapshot qty</th><th>Counted qty</th></tr></thead>` +
-          `<tbody></tbody>` +
-          `</table>`,
+        header +
+          `<div class="table-wrap">${table}</div>` +
+          (lines.length ? "" : `<p class="muted">No lines in this stocktake.</p>`),
       );
     })
     .catch((error: unknown) => {
       if (cancelled) return;
       const message = error instanceof Error ? error.message : String(error);
-      outlet.innerHTML = page(`<p class="error">Failed to load: ${message}</p>`);
+      outlet.innerHTML = page(`<p class="error">Failed to load: ${esc(message)}</p>`);
     });
 
   return () => {
