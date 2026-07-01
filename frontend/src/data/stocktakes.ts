@@ -85,3 +85,10 @@ const STATUS_LABELS: Record<StocktakeNodeStatus, string> = {
 export function statusLabel(status: StocktakeNodeStatus): string {
   return STATUS_LABELS[status];
 }
+
+// The text a global search matches against for one line: the identifiers users
+// search by (item code, name, batch), lowercased so filtering is a cheap
+// substring scan. Precompute one per line at load; see the detail view's filter.
+export function lineHaystack(l: StocktakeLine): string {
+  return `${l.item.code}\n${l.itemName}\n${l.batch ?? ""}`.toLowerCase();
+}

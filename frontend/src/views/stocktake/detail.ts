@@ -1,5 +1,11 @@
 import type { View } from "../../router.ts";
-import { getStocktake, statusLabel, stocktakeTitle } from "../../data/stocktakes.ts";
+import {
+  getStocktake,
+  lineHaystack,
+  statusLabel,
+  stocktakeTitle,
+  type StocktakeLine,
+} from "../../data/stocktakes.ts";
 import { esc } from "../../components/html.ts";
 import { renderTable } from "../../components/table.ts";
 import { lineColumns } from "./columns.ts";
@@ -15,6 +21,8 @@ export const render: View<"/stocktake/:id"> = (outlet, params) => {
   outlet.innerHTML = page(`<p class="muted">Loading…</p>`);
 
   let cancelled = false;
+  // Tears down the filter input listener + pending debounce on nav-away.
+  let teardownFilter: (() => void) | undefined;
 
   getStocktake(params.id)
     .then((detail) => {
@@ -45,11 +53,25 @@ export const render: View<"/stocktake/:id"> = (outlet, params) => {
         rowKey: (l) => l.id,
       });
 
+      // Search box + live count live ABOVE the table so filter updates never
+      // touch the input (focus/value survive). Left unstyled on purpose — the
+      // design-system "inputs" increment owns the presentation.
+      const toolbar =
+        `<div class="stock-toolbar">` +
+        `<input type="search" class="stock-filter"` +
+        ` placeholder="Search item code, name or batch…"` +
+        ` aria-label="Search stocktake lines" autocomplete="off" spellcheck="false">` +
+        `<span class="stock-count" aria-live="polite"></span>` +
+        `</div>`;
+
       outlet.innerHTML = page(
         header +
-          `<div class="table-wrap">${table}</div>` +
-          (lines.length ? "" : `<p class="muted">No lines in this stocktake.</p>`),
+          (lines.length
+            ? toolbar + `<div class="table-wrap">${table}</div>`
+            : `<p class="muted">No lines in this stocktake.</p>`),
       );
+
+      if (lines.length) teardownFilter = wireFilter(outlet, lines);
     })
     .catch((error: unknown) => {
       if (cancelled) return;
@@ -59,5 +81,53 @@ export const render: View<"/stocktake/:id"> = (outlet, params) => {
 
   return () => {
     cancelled = true;
+    teardownFilter?.();
   };
 };
+
+// Wire the client-side filter over the already-rendered rows. Uses the
+// row-visibility-toggle strategy (flip each <tr>'s inline display) — the
+// measured-cheapest update: ~57ms median / ~104ms p95 vs ~90/450ms for
+// rebuilding the tbody at 1506 rows (see docs/perf/interaction-runs.md). Purely
+// client-side over loaded data, so filtering fires no GraphQL requests.
+function wireFilter(outlet: HTMLElement, lines: readonly StocktakeLine[]): () => void {
+  const input = outlet.querySelector<HTMLInputElement>(".stock-filter");
+  const countEl = outlet.querySelector<HTMLElement>(".stock-count");
+  const rowEls = Array.from(
+    outlet.querySelectorAll<HTMLElement>('[data-testid="stocktake-table"] tbody tr'),
+  );
+  if (!input || !countEl) return () => {};
+
+  // rowEls[i] corresponds to lines[i]: renderTable emits rows in array order.
+  const haystacks = lines.map(lineHaystack);
+  const total = lines.length;
+  const setCount = (shown: number) => {
+    countEl.textContent = `Showing ${shown} of ${total}`;
+  };
+  setCount(total);
+
+  const applyFilter = (raw: string) => {
+    const q = raw.trim().toLowerCase();
+    let shown = 0;
+    for (let i = 0; i < rowEls.length; i++) {
+      const match = q === "" || haystacks[i].includes(q);
+      const want = match ? "" : "none";
+      if (rowEls[i].style.display !== want) rowEls[i].style.display = want;
+      if (match) shown++;
+    }
+    setCount(shown);
+  };
+
+  // Debounce so a fast typist coalesces keystrokes into one update.
+  let timer = 0;
+  const onInput = () => {
+    clearTimeout(timer);
+    timer = window.setTimeout(() => applyFilter(input.value), 120);
+  };
+  input.addEventListener("input", onInput);
+
+  return () => {
+    clearTimeout(timer);
+    input.removeEventListener("input", onInput);
+  };
+}
