@@ -87,7 +87,13 @@ function renderRoute() {
 }
 
 export function navigate(path: string) {
-  if (path !== location.pathname) history.pushState({}, "", path);
+  // Compare against the FULL current URL (incl. query), not just pathname:
+  // clicking a query-less link (e.g. "/stocktake") while on a filtered/paged
+  // URL ("/stocktake?page=3&status=NEW") must push the clean path so the stale
+  // query is cleared. Comparing pathname-only made that a no-op. match() still
+  // keys off location.pathname, so a link that carries its own query works too.
+  const current = location.pathname + location.search + location.hash;
+  if (path !== current) history.pushState({}, "", path);
   renderRoute();
 }
 

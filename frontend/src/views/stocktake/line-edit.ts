@@ -1,5 +1,5 @@
 import { html } from "../../components/html.ts";
-import { openModal } from "../../components/modal.ts";
+import { openModal, type ModalHandle } from "../../components/modal.ts";
 import { toast } from "../../components/toast.ts";
 import { updateStocktakeLine, type StocktakeLine } from "../../data/stocktakes.ts";
 
@@ -7,11 +7,13 @@ import { updateStocktakeLine, type StocktakeLine } from "../../data/stocktakes.t
 // server returns the full updated line, which we hand to `onSaved` so the caller
 // re-renders that row in place (no refetch). Per-line business errors (e.g. an
 // adjustment that needs a reason) and thrown errors are shown inline; the modal
-// stays open so edits aren't lost.
+// stays open so edits aren't lost. Returns the modal handle so the caller can
+// close it (e.g. on nav-away) — otherwise the <dialog> would be orphaned in the
+// top layer, trapping focus over whatever renders next.
 export function openLineEdit(
   line: StocktakeLine,
   onSaved: (updated: StocktakeLine) => void,
-): void {
+): ModalHandle {
   const body = html`
     <p class="modal-context">${line.item.code} · ${line.itemName}<br />Snapshot: ${line.snapshotNumberOfPacks} packs</p>
     <label class="form-field">
@@ -29,7 +31,7 @@ export function openLineEdit(
     <p class="form-error" role="alert" hidden></p>
   `;
 
-  openModal({
+  return openModal({
     title: "Edit line",
     body,
     submitLabel: "Save",

@@ -18,6 +18,7 @@ import {
 } from "../../components/table.ts";
 import { lineColumns } from "./columns.ts";
 import { openLineEdit } from "./line-edit.ts";
+import type { ModalHandle } from "../../components/modal.ts";
 import { toast } from "../../components/toast.ts";
 import { queryParams, setQuery } from "../../url.ts";
 
@@ -344,6 +345,10 @@ function wireTable(
   // --- edit (row click → modal), editable stocktakes only. On save the server
   // returns the full updated line, so we re-render just that <tr> in place — no
   // refetch (this is roadmap step 7). ---
+  // The modal lives in the native top layer (document.body), outside this view's
+  // outlet, so the router's innerHTML swap on nav-away can't remove it. We hold
+  // the handle and close it in teardown so it's never orphaned over the next page.
+  let activeModal: ModalHandle | undefined;
   const onSaved = (updated: StocktakeLine) => {
     const i = current.findIndex((l) => l.id === updated.id);
     if (i === -1) return;
@@ -370,7 +375,7 @@ function wireTable(
     const id = target.closest<HTMLElement>("tr")?.dataset.id;
     if (!id) return;
     const line = current.find((l) => l.id === id);
-    if (line) openLineEdit(line, onSaved);
+    if (line) activeModal = openLineEdit(line, onSaved);
   };
   if (editable) tbody.addEventListener("click", onRowClick);
 
@@ -393,6 +398,7 @@ function wireTable(
 
   return () => {
     clearTimeout(timer);
+    activeModal?.close(); // close an open edit modal so it isn't orphaned on nav-away
     input.removeEventListener("input", onInput);
     thead.removeEventListener("click", onHeadClick);
     tbody.removeEventListener("change", onRowChange);
