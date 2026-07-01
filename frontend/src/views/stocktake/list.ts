@@ -49,7 +49,7 @@ export const render: View<"/stocktake"> = (outlet) => {
     STOCKTAKE_STATUSES.map((s) => `<option value="${s}">${esc(statusLabel(s))}</option>`).join("");
 
   outlet.innerHTML =
-    `<section class="page">` +
+    `<section class="page page--start">` +
     `<h1>Stocktakes</h1>` +
     `<div class="stock-toolbar">` +
     `<input type="search" class="stock-filter" placeholder="Search description…"` +

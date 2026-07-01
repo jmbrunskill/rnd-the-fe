@@ -227,6 +227,17 @@ code {
   margin: 0;
 }
 
+/* Top-aligned variant of .page: keeps the centered 1126px column + side borders
+   but pins content to the top-left. .page centers content vertically, so on the
+   paginated list the whole block jumped when the table replaced the "Loading…"
+   state (CLS ~0.29). Top-aligning means the results region only grows downward —
+   the heading and toolbar don't move. */
+.page--start {
+  place-content: start;
+  align-items: stretch;
+  text-align: left;
+}
+
 .list {
   list-style: none;
   padding: 0;
