@@ -1,5 +1,13 @@
 import type { Column } from "../../components/table.ts";
-import type { StocktakeLine, StocktakePrefs } from "../../data/stocktakes.ts";
+import { html } from "../../components/html.ts";
+import {
+  statusLabel,
+  stocktakeTitle,
+  type StocktakeLine,
+  type StocktakePrefs,
+  type StocktakeRow,
+} from "../../data/stocktakes.ts";
+import type { StocktakeSortFieldInput } from "../../api/schema-types.ts";
 
 // Difference = (counted ?? snapshot) − snapshot. An uncounted line reads 0
 // (no change yet), matching open-mSupply's accessor. Always a number.
@@ -76,5 +84,57 @@ export function lineColumns(prefs: StocktakePrefs): Column<StocktakeLine>[] {
     },
     { header: "Manufacturer", card: "grid", value: (l) => l.manufacturer?.name ?? null },
     { header: "Comment", value: (l) => l.comment ?? null },
+  ];
+}
+
+// Identity function that constrains a column's sort `key` to a real server
+// sort-field. `sortField("descriptionn")` is a compile error, so a sortable
+// list column can't declare a key the server would reject. The list view builds
+// its URL-validation set from these same keys (via columnKey), so the two can't
+// drift.
+const sortField = <K extends StocktakeSortFieldInput>(key: K): K => key;
+
+// The stocktake LIST columns (the narrow row — no lines). Sort runs on the
+// server, so each column carries a `key` that IS a StocktakeSortFieldInput; the
+// table component renders the sortable header button + aria-sort for free and the
+// view wires a refetch on click. Description is a link into the detail view.
+export function stocktakeColumns(): Column<StocktakeRow>[] {
+  return [
+    {
+      header: "#",
+      kind: "number",
+      key: sortField("stocktakeNumber"),
+      card: "subtitle",
+      value: (s) => s.stocktakeNumber,
+    },
+    {
+      header: "Description",
+      key: sortField("description"),
+      cellClass: "cell-name",
+      card: "title",
+      // `html` renders the link; `value` is what makes the header sortable
+      // (isSortable requires it) — the server does the actual ordering.
+      value: (s) => stocktakeTitle(s),
+      html: (s) => html`<a href="/stocktake/${s.id}">${stocktakeTitle(s)}</a>`,
+    },
+    {
+      header: "Status",
+      key: sortField("status"),
+      card: "badge",
+      value: (s) => statusLabel(s.status),
+    },
+    {
+      header: "Created",
+      kind: "date",
+      key: sortField("createdDatetime"),
+      card: "grid",
+      value: (s) => s.createdDatetime,
+    },
+    {
+      header: "Comment",
+      key: sortField("comment"),
+      card: "grid",
+      value: (s) => s.comment ?? null,
+    },
   ];
 }

@@ -7,7 +7,11 @@ import {
   type StocktakeLineFragment,
   type StocktakeRowFragment,
 } from "../api/stocktake/operations.generated.ts";
-import type { StocktakeNodeStatus } from "../api/schema-types.ts";
+import type {
+  StocktakeFilterInput,
+  StocktakeNodeStatus,
+  StocktakeSortFieldInput,
+} from "../api/schema-types.ts";
 
 // All shapes come straight from the generated query types — there is no
 // hand-written interface to drift from the schema. Re-exported under friendly
@@ -36,17 +40,49 @@ export interface StocktakeDetail {
 // a real app would read it from auth / store context.
 const STORE_ID = "5B28901C52396E4BB098B9862CCF5DF9";
 
-// Fetch all stocktakes for the store, newest first. `variables` is fully typed:
-// changing a field or passing an unknown one is a compile error.
-export async function fetchStocktakes(): Promise<StocktakeRow[]> {
+// One page of results: the rows plus the server's total (for the pager). Generic
+// so any future server-paged list can reuse the shape.
+export interface Paged<T> {
+  rows: T[];
+  totalCount: number;
+}
+
+// The list view's whole query state, in domain terms (not GraphQL shapes). The
+// view owns this; `fetchStocktakes` is the single place that maps it to typed
+// GraphQL variables. `sort.key` is the schema's sort-field union, so a typo is a
+// compile error; `status` is the generated status union.
+export interface StocktakeListQuery {
+  first: number;
+  offset: number;
+  sort?: { key: StocktakeSortFieldInput; desc: boolean };
+  search?: string; // → filter.description { like } (case-insensitive contains)
+  status?: StocktakeNodeStatus; // → filter.status { equalTo }
+}
+
+// Runtime list of the status values (the type is erased at runtime). `satisfies`
+// keeps it in lock-step with the generated union — adding a status to the schema
+// without listing it here is a compile error. Drives the filter <select> and the
+// URL-value validation.
+export const STOCKTAKE_STATUSES = ["NEW", "FINALISED"] as const satisfies readonly StocktakeNodeStatus[];
+
+// Fetch one page of stocktakes for the store. Pagination, sort and filter all run
+// on the server. `variables` is fully typed against the generated operation:
+// changing a field, mistyping a sort key, or passing an unknown filter field is a
+// compile error.
+export async function fetchStocktakes(q: StocktakeListQuery): Promise<Paged<StocktakeRow>> {
+  const filter: StocktakeFilterInput = {};
+  if (q.search) filter.description = { like: q.search };
+  if (q.status) filter.status = { equalTo: q.status };
+
   const { stocktakes } = await gqlRequest(StocktakesDocument, {
     storeId: STORE_ID,
-    // `key` is checked against the schema's sort-field union ('createdDatetime'
-    // | 'status' | …); an unknown field is a compile error.
-    sort: [{ key: "createdDatetime", desc: true }],
+    page: { first: q.first, offset: q.offset },
+    // Default to newest-first when the user hasn't picked a sort.
+    sort: [q.sort ?? { key: "createdDatetime", desc: true }],
+    filter,
   });
   // `stocktakes` is a StocktakeConnector (single-member union — no guard needed).
-  return stocktakes.nodes;
+  return { rows: stocktakes.nodes, totalCount: stocktakes.totalCount };
 }
 
 // One round trip: the stocktake header, all its lines, and the column-gating
