@@ -5,3 +5,4 @@ Similar to Rafaels JS only demo, but I wanted to investigate how we can do that 
 
 https://vanjs.org/
 https://github.com/nanostores/nanostores
+https://tanstack.com/table/v8/docs/framework/vanilla/examples/basic
